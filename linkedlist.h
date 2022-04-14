@@ -16,8 +16,8 @@ LNKLIST *lnklist_init();
 // linkedlist에서 주어진 node 다음에 val를 가진 node를 삽입
 int lnklist_insert_after(LNKLIST *node, void *val);
 
-// linkedlist에서 주어진 node를 삭제
-int lnklist_delete(LNKLIST *node);
+// linkedlist에서 주어진 node를 삭제. 삭제한 node의 val을 반환
+void *lnklist_delete(LNKLIST *node);
 
 // linkedlist를 삭제
 int lnklist_destroy(LNKLIST *head);

@@ -32,18 +32,19 @@ int lnklist_insert_after(LNKLIST *node, void *val) {
 	return 0;
 }
 
-int lnklist_delete(LNKLIST *node) {
+void *lnklist_delete(LNKLIST *node) {
+	void *res;
+
 	if(node == NULL)
-		return -1;
+		return NULL;
 
 	node->prev->next = node->next;
 	node->next->prev = node->prev;
+	res = node->val;
 
-	if(node->val != NULL)
-		free(node->val);
 	free(node);
 
-	return 0;
+	return res;
 }
 
 int lnklist_destroy(LNKLIST *head) {
