@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <ctype.h>
 #include "inputcntl.h"
 
 char *get_input(FILE *fp, char * buf, int size) {
@@ -64,4 +66,88 @@ char **split_by_word(char *str) {
 	}
 
 	return result;
+}
+
+// -1 : 무제한
+// -2 : 잘못된 입력
+// 그 외 : size
+off_t strtosize(char *str) {
+	off_t size;
+	int i;
+	off_t ipart = 0;
+	int frpart = 0;
+	int frpart_digit = 1; // frpart 보다 큰 10의 거듭제곱 수 중 가장 작은 수
+	int size_unit = 1;
+
+	if(strcmp(str, "~") == 0)
+		return -1;
+	
+	if(str[0] == '0' && isdigit(str[1])) {
+		return -2;
+	}
+
+	i = 0;
+	while(1) {
+		if(isdigit(str[i])) {
+			ipart = ipart * 10 + str[i] - '0';
+			if(ipart < 0)
+				// overflow
+				return -1;
+		} else
+			break;
+
+		i++;
+	}
+
+	if(str[i] == '.') {
+		if(!isdigit(str[i+1]))
+			return -2;
+		else {
+			i++;
+			while(1) {
+				if(isdigit(str[i])) {
+					frpart = frpart * 10 + str[i] - '0';
+					frpart_digit *= 10;
+					if(1000000000 <= frpart_digit) {
+						// 소수점 아래 9자리 밑으로는 무시
+						while(isdigit(str[i]))
+							i++;
+						
+						break;
+					}
+				} else
+					break;
+				
+				i++;
+			}
+		}
+	}
+
+	if(str[i] == '\0') {
+		return ipart;
+	} else {
+		if(strcmp(str + i, "kb") == 0 || strcmp(str + i, "KB") == 0) {
+			size_unit = 1000;
+		} else if(strcmp(str + i, "mb") == 0 || strcmp(str + i, "MB") == 0) {
+			size_unit = 1000000;
+		} else if(strcmp(str + i, "gb") == 0 || strcmp(str + i, "GB") == 0) {
+			size_unit = 1000000000;
+		} else {
+			return -2;
+		}
+	}
+
+	// 단위에 맞게 정수부, 실수부 합성
+	if(frpart_digit < size_unit) {
+		frpart *= (size_unit / frpart_digit);
+	} else {
+		frpart /= (frpart_digit / size_unit);
+	}
+
+	size = ipart * size_unit;
+	if(size / size_unit != ipart)
+		// overflow
+		return -1;
+
+	return size + frpart;
 }

@@ -9,4 +9,6 @@ char *get_input(FILE *fp, char * buf, int size);
 
 char **split_by_word(char *str);
 
+off_t strtosize(char *str);
+
 #endif
