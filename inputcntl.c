@@ -151,3 +151,40 @@ off_t strtosize(char *str) {
 
 	return size + frpart;
 }
+
+// 천 단위마다 쉼표로 구분된 문자열 생성. 음수는 지원하지 않음
+int size_to_sep_str(char *buf, off_t size) {
+	off_t tmp = size;
+	int digit = 0;
+	int i;
+	int len;
+
+	if(size == 0) {
+		strcpy(buf, "0");
+		return 0;
+	} else if(size < 0) {
+		buf[0] = '\0';
+		return -1;
+	}
+
+	while(tmp) {
+		tmp /= 10;
+		digit++;
+	}
+
+	len = digit + (digit - 1) / 3; // 쉼표까지 포함한 문자열 길이
+
+	tmp = size;
+	buf[len--] = '\0';
+	i = 0;
+	while(0 <= len) {
+		buf[len--] = '0' + tmp % 10;
+		tmp /= 10;
+		if(i % 3 == 2) {
+			buf[len--] = ',';
+		}
+		i++;
+	}
+
+	return 0;
+}

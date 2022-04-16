@@ -11,4 +11,6 @@ char **split_by_word(char *str);
 
 off_t strtosize(char *str);
 
+int size_to_sep_str(char *buf, off_t size);
+
 #endif

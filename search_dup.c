@@ -6,9 +6,18 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <time.h>
 #include "linkedlist.h"
 #include "queue.h"
 #include "search_dup.h"
+#include "inputcntl.h"
+
+#define TIMESTR_BUF_SIZE 20
+
+// linkedlist 안의 linkedlist를 지우기 위한 함수
+int lnklist_dest_data(void *val) {
+	return lnklist_destroy((LNKLIST*)val, NULL);
+}
 
 // 크기 오름차순, path 사전순으로 정렬하면서 삽입한다
 int insert_filehash(LNKLIST *head, FILEHASH *fh) {
@@ -67,6 +76,9 @@ int insert_filehash(LNKLIST *head, FILEHASH *fh) {
 LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, char *(*hashfunc)(int)) {
 	QUEUE q;
 	LNKLIST *head;
+	LNKLIST *cur;
+	LNKLIST *head2;
+	LNKLIST *tmp;
 	struct stat statbuf;
 	char *rpath;
 	char *concat_tmp;
@@ -154,6 +166,59 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 		}
 	}
 
+	// 리스트를 돌면서 길이가 1인 중복세트 삭제
+	cur = head->next;
+	while(head != cur) {
+		head2 = (LNKLIST*)(cur->val);
+		tmp = cur->next;
+		if(head2->next == head2->prev) {
+			lnklist_destroy(head2, NULL);
+			lnklist_delete(cur);
+		}
+
+		cur = tmp;
+	}
+
 	free(q.arr);
 	return head;
+}
+
+void print_dup_list(FILE *fp, LNKLIST *head) {
+	LNKLIST *cur_1;
+	LNKLIST *head_2;
+	LNKLIST *cur_2;
+	LNKLIST *tmp;
+	FILEHASH *fh;
+	int set_i;
+	int file_i;
+	char bytes_buf[50];
+	char mtime_buf[TIMESTR_BUF_SIZE];
+	char atime_buf[TIMESTR_BUF_SIZE];
+	char time_format[] = "Y-m-d H:M:S";
+
+	set_i = 1;
+	cur_1 = head->next;
+	while(head != cur_1) {
+		head_2 = (LNKLIST*)(cur_1->val);
+		cur_2 = head_2->next;
+		fh = (FILEHASH*)(cur_2->val);
+		file_i = 1;
+
+		if(head_2 == cur_2) {
+			cur_1 = cur_1->next;
+			continue;
+		}
+
+		size_to_sep_str(bytes_buf, fh->size);
+		fprintf(fp, "---- Identical files #%d (%s bytes - %s) ----\n", set_i, bytes_buf, fh->hash);
+
+		while(head_2 != cur_2) {
+			strftime(mtime_buf, TIMESTR_BUF_SIZE, time_format, gmtime(&(fh->mtime)));
+			strftime(atime_buf, TIMESTR_BUF_SIZE, time_format, gmtime(&(fh->atime)));
+			fprintf(fp, "[%d] %s (mtime : %s) (atime : %s)\n", file_i, fh->pathname, mtime_buf, atime_buf);
+			file_i++;
+		}
+
+		fprintf(fp, "\n");
+	}
 }

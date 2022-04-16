@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include "linkedlist.h"
 
-LNKLIST *linklist_init() {
+LNKLIST *lnklist_init() {
 	LNKLIST *head = (LNKLIST*)malloc(sizeof(LNKLIST));
 
 	if(head == NULL)
@@ -47,7 +47,7 @@ void *lnklist_delete(LNKLIST *node) {
 	return res;
 }
 
-int lnklist_destroy(LNKLIST *head) {
+int lnklist_destroy(LNKLIST *head, void (*destroy_data)(void *)) {
 	LNKLIST *node;
 	LNKLIST *tmp;
 
@@ -60,7 +60,10 @@ int lnklist_destroy(LNKLIST *head) {
 		tmp = node->next;
 		
 		if(node->val != NULL)
-			free(node->val);
+			if(destroy_data != NULL)
+				free(node->val);
+			else
+				destroy_data(node->val);
 		free(node);
 
 		node = tmp;

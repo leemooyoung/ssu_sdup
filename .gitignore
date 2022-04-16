@@ -2,6 +2,7 @@
 
 # 실행파일
 hash_test
+inputcntl_test
 ssu_sdup
 find-md5
 find-sha1

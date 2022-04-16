@@ -4,9 +4,9 @@
 /* 아무 데이터도 갖고 있지 않은 head node만 있는 상태가 비어있는 상태인 linked list
  */
 
-typedef struct {
-	LNKLIST *prev;
-	LNKLIST *next;
+typedef struct linkedlist {
+	struct linkedlist *prev;
+	struct linkedlist *next;
 	void *val;
 } LNKLIST;
 
@@ -20,6 +20,7 @@ int lnklist_insert_after(LNKLIST *node, void *val);
 void *lnklist_delete(LNKLIST *node);
 
 // linkedlist를 삭제
-int lnklist_destroy(LNKLIST *head);
+// destroy_data가 NULL이면 val에 대해 free를 호출
+int lnklist_destroy(LNKLIST *head, void (*destroy_data)(void *));
 
 #endif
