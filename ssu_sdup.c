@@ -65,7 +65,7 @@ int main(void) {
 
 		if(strcmp("fmd5", words[0]) == 0) {
 			words[0] = FIND_MD5_EXEC_PATH;
-			// status = exec(FIND_MD5_EXEC_PATH, words);
+			status = exec(FIND_MD5_EXEC_PATH, words);
 		} else if(strcmp("fsha1", words[0]) == 0) {
 			words[0] = FIND_SHA1_EXEC_PATH;
 			// status = exec(FIND_SHA1_EXEC_PATH, words);

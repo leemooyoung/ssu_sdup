@@ -47,6 +47,10 @@ int insert_filehash(LNKLIST *head, FILEHASH *fh) {
 		cur_1 = cur_1->next;
 	}
 
+	// 비교했을 때 처음으로 fh 쪽이 작은 원소를 마주치지 못했다면 head의 이전(가장 뒤) 에 삽입
+	if(insert_before_1 == NULL)
+		insert_before_1 = head;
+
 	if(matched) {
 		// 중복된 파일을 찾았다면 pathname 사전 오름차순으로 정렬되도록 삽입
 		head_2 = cur_2;
@@ -90,8 +94,10 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 	int fd;
 	FILEHASH *fh;
 
-	if(stat(path, &statbuf) < 0)
+	if(stat(path, &statbuf) < 0) {
+		fprintf(stderr, "path error\n");
 		return NULL;
+	}
 	
 	if(S_ISDIR(statbuf.st_mode) == 0)
 		return NULL;
@@ -105,8 +111,16 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 
 	while(q.start != q.end) {
 		rpath = (char*)dequeue(&q);
+
+		if(rpath == NULL)
+			break;
+
 		if(stat(rpath, &statbuf) < 0)
 			continue;
+
+#ifdef DEBUG
+		fprintf(stderr, "left : %d, checking %s\n", left_in_queue(&q), rpath);
+#endif
 
 		if(S_ISDIR(statbuf.st_mode)) {
 			// 폴더인 경우 하위 디렉토리/파일들을 큐에 넣는다
@@ -134,7 +148,7 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 			// 일반 파일인 경우 확장자, 크기 검사 후 해시 값을 구하고 중복되는 값을 찾으면서 리스트에 삽입
 			// 크기 검사
 			if(!(
-				(llimit == -1 || llimit <= statbuf.st_size)
+				(0 < statbuf.st_size && (llimit == -1 || llimit <= statbuf.st_size))
 				&& (ulimit == -1 || statbuf.st_size <= ulimit)
 			)) {
 				free(rpath);
@@ -194,7 +208,7 @@ void print_dup_list(FILE *fp, LNKLIST *head) {
 	char bytes_buf[50];
 	char mtime_buf[TIMESTR_BUF_SIZE];
 	char atime_buf[TIMESTR_BUF_SIZE];
-	char time_format[] = "Y-m-d H:M:S";
+	char time_format[] = "%Y-%m-%d %H:%M:%S";
 
 	set_i = 1;
 	cur_1 = head->next;
@@ -213,12 +227,16 @@ void print_dup_list(FILE *fp, LNKLIST *head) {
 		fprintf(fp, "---- Identical files #%d (%s bytes - %s) ----\n", set_i, bytes_buf, fh->hash);
 
 		while(head_2 != cur_2) {
+			fh = (FILEHASH*)(cur_2->val);
 			strftime(mtime_buf, TIMESTR_BUF_SIZE, time_format, gmtime(&(fh->mtime)));
 			strftime(atime_buf, TIMESTR_BUF_SIZE, time_format, gmtime(&(fh->atime)));
 			fprintf(fp, "[%d] %s (mtime : %s) (atime : %s)\n", file_i, fh->pathname, mtime_buf, atime_buf);
 			file_i++;
+			cur_2 = cur_2->next;
 		}
 
+		set_i++;
+		cur_1 = cur_1->next;
 		fprintf(fp, "\n");
 	}
 }

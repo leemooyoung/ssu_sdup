@@ -31,12 +31,12 @@ int enqueue(QUEUE *q, void *val) {
 
 		if(q->end < q->start) {
 			// 한바퀴 돌아서 end가 start보다 앞에 있을 경우
-			memcpy(tmp, q->arr + q->start, q->size - q->start);
-			memcpy(tmp + q->size - q->start + 1, q->arr, q->end);
+			memcpy(tmp, q->arr + q->start, sizeof(void*) * (q->size - q->start));
+			memcpy(tmp + q->size - q->start, q->arr, sizeof(void*) * q->end);
 			count = q->size - q->start + q->end;
 		} else {
 			// 한바퀴 돌지 않은 경우
-			memcpy(tmp, q->arr + q->start, q->end - q->start);
+			memcpy(tmp, q->arr + q->start, sizeof(void*) * (q->end - q->start));
 			count = q->end - q->start;
 		}
 
@@ -57,8 +57,20 @@ int enqueue(QUEUE *q, void *val) {
 void *dequeue(QUEUE *q) {
 	void *res;
 
+	if(q->start == q->end)
+		return NULL;
+
 	res = q->arr[q->start];
 	q->start = (q->start + 1) % q->size;
 
 	return res;
+}
+
+int left_in_queue(QUEUE *q) {
+	if(q->start == q->end)
+		return 0;
+	else if(q->start < q->end)
+		return q->end - q->start;
+	else
+		return q->size - q->start + q->end;
 }

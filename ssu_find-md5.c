@@ -34,21 +34,21 @@ int main(int argc, char *argv[]) {
 	// FILE_EXTENSION 인자 검사
 	if(strcmp(argv[1], "*") == 0) {
 		fext = NULL;
-	} else if(strncmp(argv[1], "*.", 2) == 0) {
+	} else if(strncmp(argv[1], "*.", 2) == 0 && argv[1][2] != '\0') {
 		fext = argv[1] + 1;
 	} else {
-		fprintf(stderr, "[FILE_EXTENSION] : * | *.[extension]");
+		fprintf(stderr, "[FILE_EXTENSION] : * | *.[extension]\n");
 		exit(1);
 	}
 
 	// MINSIZE, MAXSIZE 검사
 	if((llimit = strtosize(argv[2])) == -2) {
-		fprintf(stderr, "[MINSIZE] : ([integer] | [float])(kb | KB | mb | MB | gb | GB)");
+		fprintf(stderr, "[MINSIZE] : ([integer] | [float])(kb | KB | mb | MB | gb | GB)\n");
 		exit(1);
 	}
 
 	if((ulimit = strtosize(argv[3])) == -2) {
-		fprintf(stderr, "[MAXSIZE] : ([integer] | [float])(kb | KB | mb | MB | gb | GB)");
+		fprintf(stderr, "[MAXSIZE] : ([integer] | [float])(kb | KB | mb | MB | gb | GB)\n");
 		exit(1);
 	}
 

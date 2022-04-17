@@ -1,6 +1,10 @@
 CC=gcc
 LDFLAGS=-lcrypto
 
+ifeq ($(DEBUG), 1)
+DBG_FLAGS=-g
+endif
+
 HASH_TEST_TARGET=hash_test
 HASH_TEST_OBJECTS=hash.o hash_test.o
 
@@ -16,11 +20,14 @@ FIND_MD5_OBJECTS=ssu_find-md5.o hash.o search_dup.o inputcntl.o queue.o linkedli
 HELP_TARGET=help
 HELP_SRC=ssu_help.c
 
-.PHONY: all clean
+.PHONY: all debug clean
 all: $(SDUP_TARGET) $(FIND_MD5_TARGET) $(HELP_TARGET)
 
+debug: DBG_FLAGS=-g
+debug: all
+
 clean:
-	rm $(SDUP_TARGET) $(FIND_MD5_OBJECTS) $(HELP_TARGET) $(HASH_TEST_TARGET) $(INPUTCNTL_TEST_TARGET) *.o
+	-rm $(SDUP_TARGET) $(FIND_MD5_TARGET) $(HELP_TARGET) $(HASH_TEST_TARGET) $(INPUTCNTL_TEST_TARGET) *.o
 
 $(SDUP_TARGET): $(SDUP_OBJECTS)
 	$(CC) -o $@ $(SDUP_OBJECTS)
@@ -29,7 +36,7 @@ $(FIND_MD5_TARGET): $(FIND_MD5_OBJECTS)
 	$(CC) -o $@ $(FIND_MD5_OBJECTS) $(LDFLAGS)
 
 $(HELP_TARGET): $(HELP_SRC)
-	$(CC) -o $@ $(HELP_SRC)
+	$(CC) -o $@ $(HELP_SRC) $(DBG_FLAGS)
 
 $(HASH_TEST_TARGET): $(HASH_TEST_OBJECTS)
 	$(CC) -o $@ $(HASH_TEST_OBJECTS) $(LDFLAGS)
@@ -38,25 +45,25 @@ $(INPUTCNTL_TEST_TARGET): $(INPUTCNTL_TEST_OBJECTS)
 	$(CC) -o $@ $(INPUTCNTL_TEST_OBJECTS)
 
 hash_test.o: hash_test.c hash.h
-	$(CC) -c hash_test.c
+	$(CC) -c hash_test.c $(DBG_FLAGS)
 
 ssu_sdup.o: ssu_sdup.c inputcntl.h
-	$(CC) -c ssu_sdup.c
+	$(CC) -c ssu_sdup.c $(DBG_FLAGS)
 
 ssu_find-md5.o: ssu_find-md5.c hash.h search_dup.h inputcntl.h linkedlist.h
-	$(CC) -c ssu_find-md5.c
+	$(CC) -c ssu_find-md5.c $(DBG_FLAGS)
 
 search_dup.o: search_dup.c search_dup.h inputcntl.h queue.h linkedlist.h
-	$(CC) -c search_dup.c
+	$(CC) -c search_dup.c $(DBG_FLAGS)
 
 hash.o: hash.c hash.h
-	$(CC) -c hash.c
+	$(CC) -c hash.c $(DBG_FLAGS)
 
 inputcntl.o: inputcntl.c inputcntl.h
-	$(CC) -c inputcntl.c
+	$(CC) -c inputcntl.c $(DBG_FLAGS)
 
 queue.o: queue.c queue.h
-	$(CC) -c queue.c
+	$(CC) -c queue.c $(DBG_FLAGS)
 
 linkedlist.o: linkedlist.c linkedlist.h
-	$(CC) -c linkedlist.c
+	$(CC) -c linkedlist.c $(DBG_FLAGS)

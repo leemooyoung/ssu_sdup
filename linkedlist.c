@@ -60,7 +60,7 @@ int lnklist_destroy(LNKLIST *head, void (*destroy_data)(void *)) {
 		tmp = node->next;
 		
 		if(node->val != NULL)
-			if(destroy_data != NULL)
+			if(destroy_data == NULL)
 				free(node->val);
 			else
 				destroy_data(node->val);

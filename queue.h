@@ -25,4 +25,7 @@ int enqueue(QUEUE *q, void *val);
 // 제거
 void *dequeue(QUEUE *q);
 
+// 남은 원소 갯수 확인
+int left_in_queue(QUEUE *q);
+
 #endif
