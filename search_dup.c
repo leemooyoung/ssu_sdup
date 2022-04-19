@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <errno.h>
 #include "linkedlist.h"
 #include "queue.h"
 #include "search_dup.h"
@@ -65,19 +66,36 @@ int insert_filehash(LNKLIST *head, FILEHASH *fh) {
 		insert_before_1 = head;
 
 	if(matched) {
-		// 중복된 파일을 찾았다면 pathname 사전 오름차순으로 정렬되도록 삽입
+		/* 중복된 파일을 찾았다면
+		 * 1. path의 depth 오름차순
+		 * 2. pathname 사전 오름차순
+		 * 으로 정렬해야 한다.
+		 * search_dup에서 BFS로 탐색하기 때문에 계속 뒤에 삽입하게 되면 자연스레 depth 오름차순으로 정렬되게 된다.
+		 * 중요한건 같은 depth인 것들 사이에서 pathname 사전 오름차순으로 정렬하는 것이다.
+		 */
 		head_2 = cur_2;
-		cur_2 = head_2->next;
-		while(head_2 != cur_2) {
-			fhtmp = (FILEHASH*)(cur_2->val);
+		cur_2 = head_2->prev;
+		fhtmp = (FILEHASH*)(cur_2->val);
+		if(fhtmp->depth < fh->depth) {
+			// 삽입하려는 파일이 더 깊이 있으면 가장 뒤에 삽입
+			cur_2 = head_2->prev;
+		} else {
+			// 삽입하려는 파일과 깊이가 같으면 (얕을 수는 없다) 같은 깊이인 파일들 안에서 사전순으로 정렬
+			while(cur_2 != head_2) {
+				fhtmp = (FILEHASH*)(cur_2->val);
+				if(fhtmp->depth < fh->depth)
+					// 같은 깊이인 파일들의 범위를 벗어남
+					break;
 
-			if(strcmp(fh->pathname, fhtmp->pathname) < 0)
-				break;
+				if(strcmp(fhtmp->pathname, fh->pathname) < 0)
+					// 처음으로 사전순으로 앞서는 것의 뒤에 삽입하기 위해서
+					break;
 
-			cur_2 = cur_2->next;
+				cur_2 = cur_2->prev;
+			}
 		}
 
-		lnklist_insert_after(cur_2->prev, fh);
+		lnklist_insert_after(cur_2, fh);
 	} else {
 		// 중복된 파일을 찾지 못했다면 size 오름차순으로 정렬되도록
 		// 이전에 찾은 insert_before_1의 이전에 새로운 링크드 리스트를 삽입
@@ -98,7 +116,6 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 	LNKLIST *tmp;
 	struct stat statbuf;
 	char *rpath;
-	char *concat_tmp;
 	DIR *dirp;
 	struct dirent *dentry;
 	int path_len;
@@ -106,6 +123,9 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 	int fext_len;
 	int fd;
 	FILEHASH *fh;
+	QENTRY *qe;
+	QENTRY *qe_tmp;
+	int exclude_cnt = 0;
 
 	if(stat(path, &statbuf) < 0) {
 		fprintf(stderr, "path error\n");
@@ -120,16 +140,23 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 	head = lnklist_init();
 
 	queue_init(&q);
-	enqueue(&q, realpath(path, NULL));
+	qe = (QENTRY*)malloc(sizeof(QENTRY));
+	qe->depth = 0;
+	qe->pathname = realpath(path, NULL);
+	enqueue(&q, qe);
 
 	while(q.start != q.end) {
-		rpath = (char*)dequeue(&q);
-
-		if(rpath == NULL)
+		qe = (QENTRY*)dequeue(&q);
+		if(qe == NULL)
 			break;
 
-		if(stat(rpath, &statbuf) < 0)
+		rpath = qe->pathname;
+
+		if(stat(rpath, &statbuf) < 0) {
+			free(qe);
+			free(rpath);
 			continue;
+		}
 
 #ifdef DEBUG
 		fprintf(stderr, "left : %d, checking %s\n", left_in_queue(&q), rpath);
@@ -138,18 +165,39 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 		if(S_ISDIR(statbuf.st_mode)) {
 			// 폴더인 경우 하위 디렉토리/파일들을 큐에 넣는다
 			dirp = opendir(rpath);
-			while((dentry = readdir(dirp)) != NULL) {
-				if(strcmp(dentry->d_name, ".") == 0 || strcmp(dentry->d_name, "..") == 0)
-					// . 또는 ..의 경우 
-					continue;
+			if(dirp == NULL) {
+				fprintf(stderr, "opendir error : \"%s\" - %s\n", rpath, strerror(errno));
+			} else {
+				while((dentry = readdir(dirp)) != NULL) {
+					if(strcmp(dentry->d_name, ".") == 0 || strcmp(dentry->d_name, "..") == 0)
+						// . 또는 ..의 경우 
+						continue;
 
-				// 절대경로 구하기
-				concat_tmp = path_concat(rpath, dentry->d_name);
+					if(
+						strcmp(rpath, "/") == 0 && exclude_cnt < 3
+						&& (
+							strcmp(dentry->d_name, "proc") == 0
+							|| strcmp(dentry->d_name, "run") == 0
+							|| strcmp(dentry->d_name, "sys") == 0
+						)
+					) {
+						// /proc, /run, /sys 디렉토리 제외
+						exclude_cnt++;
+						continue;
+					}
 
-				enqueue(&q, concat_tmp);
+					// 절대경로 구하면서 qentry 생성
+					qe_tmp = (QENTRY*)malloc(sizeof(QENTRY));
+					qe_tmp->depth = qe->depth + 1;
+					qe_tmp->pathname = path_concat(rpath, dentry->d_name);
+
+					enqueue(&q, qe_tmp);
+				}
+
+				closedir(dirp);
 			}
 
-			closedir(dirp);
+			free(qe);
 			free(rpath);
 		} else if(S_ISREG(statbuf.st_mode)) {
 			// 일반 파일인 경우 확장자, 크기 검사 후 해시 값을 구하고 중복되는 값을 찾으면서 리스트에 삽입
@@ -158,6 +206,7 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 				(0 < statbuf.st_size && (llimit == -1 || llimit <= statbuf.st_size))
 				&& (ulimit == -1 || statbuf.st_size <= ulimit)
 			)) {
+				free(qe);
 				free(rpath);
 				continue;
 			}
@@ -166,22 +215,29 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 			if(fextension != NULL) {
 				path_len = strlen(rpath);
 				if(path_len - fext_len <= 0 || strcmp(rpath + path_len - fext_len, fextension) != 0) {
+					free(qe);
 					free(rpath);
 					continue;
 				}
 			}
 
 			fd = open(rpath, O_RDONLY);
+			if(fd < 0) {
+				fprintf(stderr, "open error : \"%s\" - %s\n", rpath, strerror(errno));
+			} else {
+				fh = (FILEHASH*)malloc(sizeof(FILEHASH));
+				fh->size = statbuf.st_size;
+				fh->pathname = rpath;
+				fh->hash = hashstrfunc(fd);
+				fh->mtime = statbuf.st_mtime;
+				fh->atime = statbuf.st_atime;
+				fh->depth = qe->depth;
 
-			fh = (FILEHASH*)malloc(sizeof(FILEHASH));
-			fh->size = statbuf.st_size;
-			fh->pathname = rpath;
-			fh->hash = hashstrfunc(fd);
-			fh->mtime = statbuf.st_mtime;
-			fh->atime = statbuf.st_atime;
+				close(fd);
+				insert_filehash(head, fh);
+			}
 
-			close(fd);
-			insert_filehash(head, fh);
+			free(qe);
 		} else {
 			// 이외의 경우 아무것도 하지 않음
 		}

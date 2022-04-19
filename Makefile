@@ -1,8 +1,8 @@
 CC=gcc
 LDFLAGS=-lcrypto
 
-ifeq ($(DEBUG), 1)
-DBG_FLAGS=-g
+ifeq ($(DBG_LOG), 1)
+DBG_FLAGS+=-D DEBUG
 endif
 
 HASH_TEST_TARGET=hash_test
@@ -26,7 +26,7 @@ HELP_SRC=ssu_help.c
 .PHONY: all debug clean
 all: $(SDUP_TARGET) $(FIND_MD5_TARGET) $(FIND_SHA1_TARGET) $(HELP_TARGET)
 
-debug: DBG_FLAGS=-g
+debug: DBG_FLAGS+=-g
 debug: all
 
 clean:

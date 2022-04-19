@@ -12,7 +12,13 @@ typedef struct {
 	char *hash;
 	time_t mtime;
 	time_t atime;
+	int depth;
 } FILEHASH;
+
+typedef struct {
+	char *pathname;
+	int depth;
+} QENTRY;
 
 void free_filehash(void* fh);
 

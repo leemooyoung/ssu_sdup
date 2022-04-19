@@ -194,10 +194,17 @@ char *path_concat(char *path1, char *path2) {
 	int path2_len = strlen(path2);
 	char *str;
 	
-	str = (char*)malloc(sizeof(char) * (path1_len + path2_len + 2));
-	strcpy(str, path1);
-	str[path1_len] = '/';
-	strcpy(str + path1_len + 1, path2);
+	if(path1[path1_len-1] == '/') {
+		// path1이 '/'로 끝나면 크기를 하나 적게 잡고, 중간에 '/'를 삽입하지 않는다.
+		str = (char*)malloc(sizeof(char) * (path1_len + path2_len + 1));
+		strcpy(str, path1);
+		strcpy(str + path1_len, path2);
+	} else {
+		str = (char*)malloc(sizeof(char) * (path1_len + path2_len + 2));
+		strcpy(str, path1);
+		str[path1_len] = '/';
+		strcpy(str + path1_len + 1, path2);
+	}
 
 	return str;
 }
