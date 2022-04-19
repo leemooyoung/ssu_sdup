@@ -15,6 +15,8 @@
 #include "search_dup.h"
 #include "inputcntl.h"
 
+extern char *trash_path;
+
 void free_filehash(void *fh) {
 	if(fh == NULL)
 		return;
@@ -171,6 +173,10 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 				while((dentry = readdir(dirp)) != NULL) {
 					if(strcmp(dentry->d_name, ".") == 0 || strcmp(dentry->d_name, "..") == 0)
 						// . 또는 ..의 경우 
+						continue;
+					
+					// trash 디렉토리 생략
+					if(trash_path != NULL && strcmp(rpath, trash_path) == 0)
 						continue;
 
 					if(

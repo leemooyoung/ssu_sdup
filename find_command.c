@@ -12,6 +12,9 @@
 
 #define INPUT_SIZE (100)
 
+char *trash_path;
+char trash_name[] = ".trash";
+
 void print_option_help() {
 	printf(
 ">> [SET_INDEX] [OPTION ...]\n\
@@ -19,7 +22,42 @@ void print_option_help() {
    d [LIST_IDX] : delete [LIST_IDX] file\n\
    i : ask for confirmation before delete\n\
    f : force delete except the recently modified file\n\
-   t : force move to Trash except the recently modified file\n\n");
+   t : force move to Trash except the recently modified file\n\
+   da : force delete all files\n\
+   ta : force move all files to Trash\n\
+   of : force delete except the oldest modified file\n\
+   ot : force move to Trash except the oldest modified file\n\n");
+}
+
+// 임의의 디렉토리를 trash 디렉토리로 사용해도 된다고 하셨기 때문에 ~/.trash로 정함
+char *create_trash_dir(char *trash_name) {
+	char *home_path;
+	char *trash_path_loc;
+	struct stat statbuf;
+
+	if((home_path = getenv("HOME")) == NULL) {
+		fprintf(stderr, "trash folder creation error\n");
+		return NULL;
+	}
+
+	trash_path_loc = path_concat(home_path, trash_name);
+
+	if(stat(trash_path_loc, &statbuf) < 0) {
+		if(mkdir(trash_path_loc, 0755) < 0) {
+			// 없어서 만들었는데 만들기 실패
+			fprintf(stderr, "trash folder creation error\n");
+			free(trash_path_loc);
+			return NULL;
+		}
+	} else
+		if(!S_ISDIR(statbuf.st_mode)) {
+			// 있는데 디렉토리가 아님
+			fprintf(stderr, "trash folder creation error. delete \"%s\"\n", trash_path_loc);
+			free(trash_path_loc);
+			return NULL;
+		}
+
+	return trash_path_loc;
 }
 
 int find_command(int argc, char *argv[], char *(*hashstrfunc)(int)) {
@@ -91,6 +129,11 @@ int find_command(int argc, char *argv[], char *(*hashstrfunc)(int)) {
 
 	closedir(dp);
 
+	// trash 디렉토리 생성
+	if(trash_path == NULL) {
+		trash_path = create_trash_dir(trash_name);
+	}
+
 	gettimeofday(&start_tv, NULL);
 	head = search_dup(target_dir, llimit, ulimit, fext, hashstrfunc);
 	gettimeofday(&end_tv, NULL);
@@ -150,6 +193,14 @@ int find_command(int argc, char *argv[], char *(*hashstrfunc)(int)) {
 				option = FIND_OPTION_FORCE;
 			} else if(strcmp(words[1], "t") == 0) {
 				option = FIND_OPTION_TRASH;
+			} else if(strcmp(words[1], "da") == 0) {
+				option = FIND_OPTION_DELETE_ALL;
+			} else if(strcmp(words[1], "ta") == 0) {
+				option = FIND_OPTION_TRASH_ALL;
+			} else if(strcmp(words[1], "of") == 0) {
+				option = FIND_OPTION_OLD_FORCE;
+			} else if(strcmp(words[1], "ot") == 0) {
+				option = FIND_OPTION_OLD_TRASH;
 			} else {
 				is_worng_option = 1;
 			}
@@ -161,6 +212,8 @@ int find_command(int argc, char *argv[], char *(*hashstrfunc)(int)) {
 				} else {
 					option = FIND_OPTION_DELETE;
 				}
+			} else {
+				is_worng_option = 1;
 			}
 		} else {
 			is_worng_option = 1;
@@ -185,8 +238,51 @@ int find_command(int argc, char *argv[], char *(*hashstrfunc)(int)) {
 
 	if(target_dir != argv[4] && target_dir != env_home)
 		free(target_dir);
+	
+	if(trash_path != NULL) {
+		free(trash_path);
+		trash_path = NULL;
+	}
 
 	lnklist_destroy(head, lnklist_dest_fh);
+
+	return 0;
+}
+
+int remove_all_files(LNKLIST *head, int option) {
+	LNKLIST *node;
+	FILEHASH *fh;
+	char *del_pathname;
+
+	if(trash_path == NULL)
+		return 1;
+
+	node = head->next;
+	while(node != head) {
+		fh = (FILEHASH*)(node->val);
+		if(option == FIND_OPTION_FORCE || option == FIND_OPTION_DELETE_ALL || option == FIND_OPTION_OLD_FORCE) {
+			// 삭제
+			if(remove(fh->pathname) < 0)
+				fprintf(stderr, "delete error : %s\n", fh->pathname);
+		} else if(option == FIND_OPTION_TRASH || option == FIND_OPTION_TRASH_ALL || option == FIND_OPTION_OLD_TRASH) {
+			// 휴지통으로 이동
+			del_pathname = path_concat(trash_path, get_filename(fh->pathname));
+			if(rename(fh->pathname, del_pathname) < 0) {
+				// 이동 실패시 삭제
+				fprintf(stderr, "move to trash failed. delete : %s\n", fh->pathname);
+				if(trash_path != NULL) {
+					free(trash_path);
+					trash_path = NULL;
+				}
+				if(remove(fh->pathname) < 0)
+					fprintf(stderr, "delete error : %s\n", fh->pathname);
+			}
+
+			free(del_pathname);
+		}
+		
+		node = node->next;
+	}
 
 	return 0;
 }
@@ -194,11 +290,6 @@ int find_command(int argc, char *argv[], char *(*hashstrfunc)(int)) {
 int dup_set_process(LNKLIST *head, int set_index, int option, int list_index) {
 	char input[INPUT_SIZE];
 	char timestr_buf[TIMESTR_BUF_SIZE];
-	char trash_name[] = ".trash";
-	char *trash_path;
-	char *home_path;
-	char *del_pathname;
-	int home_len;
 	struct stat statbuf;
 	LNKLIST *set_node;
 	LNKLIST *set;
@@ -265,29 +356,13 @@ int dup_set_process(LNKLIST *head, int set_index, int option, int list_index) {
 				lnklist_destroy((LNKLIST*)lnklist_delete(set_node), free_filehash);
 		break;
 		case FIND_OPTION_TRASH:
-			// trash 옵션인 경우 trash 폴더가 있는지 검사. 없다면 만들기를 시도
-			// 임의의 폴더를 trash 폴더로 사용해도 된다고 하셨기 때문에 ~/.trash로 정함
-			if((home_path = getenv("HOME")) == NULL) {
-				fprintf(stderr, "trash folder creation error\n");
-				return 3;
+			// trash 옵션인 경우 trash 폴더가 있는지 검사. 없다면(trash_path == NULL) 만들기를 시도
+			if(trash_path == NULL) {
+				trash_path = create_trash_dir(trash_name);
+				if(trash_path == NULL)
+					// 만들기 실패했다면 종료
+					return 3;
 			}
-
-			trash_path = path_concat(home_path, trash_name);
-
-			if(stat(trash_path, &statbuf) < 0) {
-				if(mkdir(trash_path, 0755) < 0) {
-					// 없어서 만들었는데 만들기 실패
-					fprintf(stderr, "trash folder creation error\n");
-					free(trash_path);
-					return 3;
-				}
-			} else
-				if(!S_ISDIR(statbuf.st_mode)) {
-					// 있는데 디렉토리가 아님
-					fprintf(stderr, "trash folder creation error. delete \"%s\"\n", trash_path);
-					free(trash_path);
-					return 3;
-				}
 		case FIND_OPTION_FORCE:
 			// trash, force 옵션의 공통부분. 중복 파일 세트를 돌면서 작업(삭제, 이동) 수행
 			node = set->next;
@@ -304,38 +379,66 @@ int dup_set_process(LNKLIST *head, int set_index, int option, int list_index) {
 			latest_fh = lnklist_delete(latest);
 			timestr(timestr_buf, latest_fh->mtime);
 
-			node = set->next;
-			while(node != set) {
-				fh = (FILEHASH*)(node->val);
-				if(option == FIND_OPTION_FORCE) {
-					// 삭제
-					if(remove(fh->pathname) < 0)
-						fprintf(stderr, "delete error : %s\n", fh->pathname);
-				} else if(option == FIND_OPTION_TRASH) {
-					// 휴지통으로 이동
-					del_pathname = path_concat(trash_path, get_filename(fh->pathname));
-					if(rename(fh->pathname, del_pathname) < 0) {
-						// 이동 실패시 삭제
-						fprintf(stderr, "move to trash failed. delete : %s\n", fh->pathname);
-						if(remove(fh->pathname) < 0)
-							fprintf(stderr, "delete error : %s\n", fh->pathname);
-					}
-
-					free(del_pathname);
-				}
-				
-				node = node->next;
-			}
-
+			remove_all_files(set, option);
 			lnklist_destroy((LNKLIST*)lnklist_delete(set_node), free_filehash);
 
 			if(option == FIND_OPTION_FORCE)
 				printf("Left file in #%d : %s (%s)\n\n", set_index, latest_fh->pathname, timestr_buf);
-			else if(option == FIND_OPTION_TRASH) {
+			else if(option == FIND_OPTION_TRASH)
 				printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n", set_index, latest_fh->pathname, timestr_buf);
-				free(trash_path);
-			}
 			
+			free_filehash(latest_fh);
+		break;
+		case FIND_OPTION_TRASH_ALL:
+			// trash 옵션인 경우 trash 폴더가 있는지 검사. 없다면(trash_path == NULL) 만들기를 시도
+			if(trash_path == NULL) {
+				trash_path = create_trash_dir(trash_name);
+				if(trash_path == NULL)
+					// 만들기 실패했다면 종료
+					return 3;
+			}
+		case FIND_OPTION_DELETE_ALL:
+			remove_all_files(set, option);
+			lnklist_destroy((LNKLIST*)lnklist_delete(set_node), free_filehash);
+
+			if(option == FIND_OPTION_DELETE_ALL)
+				printf("All files in #%d have deleted\n\n", set_index);
+			else if(option == FIND_OPTION_TRASH_ALL)
+				printf("ALL files in #%d have moved to Trash\n\n", set_index);
+		break;
+		case FIND_OPTION_OLD_TRASH:
+			// trash 옵션인 경우 trash 폴더가 있는지 검사. 없다면(trash_path == NULL) 만들기를 시도
+			if(trash_path == NULL) {
+				trash_path = create_trash_dir(trash_name);
+				if(trash_path == NULL)
+					// 만들기 실패했다면 종료
+					return 3;
+			}
+		case FIND_OPTION_OLD_FORCE:
+			node = set->next;
+			// 여기서는 latest가 아니긴 하지만 그냥 갖다 씀
+			// 가장 오래전에 수정된 파일 찾기
+			latest = node;
+			while(node != set) {
+				fh = (FILEHASH*)(node->val);
+				if(((FILEHASH*)(latest->val))->mtime > fh->mtime) {
+					latest = node;
+				}
+
+				node = node->next;
+			}
+
+			latest_fh = lnklist_delete(latest);
+			timestr(timestr_buf, latest_fh->mtime);
+
+			remove_all_files(set, option);
+			lnklist_destroy((LNKLIST*)lnklist_delete(set_node), free_filehash);
+
+			if(option == FIND_OPTION_OLD_FORCE)
+				printf("Left file in #%d : %s (%s)\n\n", set_index, latest_fh->pathname, timestr_buf);
+			else if(option == FIND_OPTION_OLD_TRASH)
+				printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n", set_index, latest_fh->pathname, timestr_buf);
+
 			free_filehash(latest_fh);
 		break;
 		default:
