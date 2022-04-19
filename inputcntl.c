@@ -188,3 +188,25 @@ int size_to_sep_str(char *buf, off_t size) {
 
 	return 0;
 }
+
+char *path_concat(char *path1, char *path2) {
+	int path1_len = strlen(path1);
+	int path2_len = strlen(path2);
+	char *str;
+	
+	str = (char*)malloc(sizeof(char) * (path1_len + path2_len + 2));
+	strcpy(str, path1);
+	str[path1_len] = '/';
+	strcpy(str + path1_len + 1, path2);
+
+	return str;
+}
+
+char *get_filename(char *path) {
+	char *p = path;
+	while((p = strchr(path, '/')) != NULL) {
+		path = p + 1;
+	}
+
+	return path;
+}

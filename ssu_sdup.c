@@ -7,7 +7,7 @@
 #include "hash.h"
 #include "inputcntl.h"
 
-#define INPUT_SIZE 100
+#define INPUT_SIZE (100)
 
 #define FIND_MD5_EXEC_PATH ("./find-md5")
 #define FIND_SHA1_EXEC_PATH ("./find-sha1")
@@ -68,11 +68,20 @@ int main(void) {
 			status = exec(FIND_MD5_EXEC_PATH, words);
 		} else if(strcmp("fsha1", words[0]) == 0) {
 			words[0] = FIND_SHA1_EXEC_PATH;
-			// status = exec(FIND_SHA1_EXEC_PATH, words);
+			status = exec(FIND_SHA1_EXEC_PATH, words);
 		} else if(strcmp("exit", words[0]) == 0 && words[1] == NULL) {
+			free(words);
 			break;
 		} else {
 			status = exec(HELP_EXEC_PATH, words);
 		}
+
+		free(words);
+		if(WIFSIGNALED(status)) {
+			fprintf(stderr, "status : %d\n", WTERMSIG(status));
+		}
 	}
+
+	printf("Prompt End\n");
+	exit(0);
 }

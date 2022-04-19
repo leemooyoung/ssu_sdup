@@ -1,3 +1,5 @@
+// 중복 파일 탐색 및 중복 파일 리스트 출력
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,11 +14,22 @@
 #include "search_dup.h"
 #include "inputcntl.h"
 
-#define TIMESTR_BUF_SIZE 20
+void free_filehash(void *fh) {
+	if(fh == NULL)
+		return;
 
-// linkedlist 안의 linkedlist를 지우기 위한 함수
-int lnklist_dest_data(void *val) {
-	return lnklist_destroy((LNKLIST*)val, NULL);
+	if(((FILEHASH*)fh)->hash != NULL)
+		free(((FILEHASH*)fh)->hash);
+	
+	if(((FILEHASH*)fh)->pathname != NULL)
+		free(((FILEHASH*)fh)->pathname);
+	
+	free(fh);
+}
+
+// linkedlist 안의 FILEHASH를 가지고 있는 linkedlist를 지우기 위한 함수
+void lnklist_dest_fh(void *head) {
+	lnklist_destroy((LNKLIST*)head, free_filehash);
 }
 
 // 크기 오름차순, path 사전순으로 정렬하면서 삽입한다
@@ -77,7 +90,7 @@ int insert_filehash(LNKLIST *head, FILEHASH *fh) {
 }
 
 // 이중 링크드 리스트를 사용한다
-LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, char *(*hashfunc)(int)) {
+LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, char *(*hashstrfunc)(int)) {
 	QUEUE q;
 	LNKLIST *head;
 	LNKLIST *cur;
@@ -131,13 +144,7 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 					continue;
 
 				// 절대경로 구하기
-				path_len = strlen(rpath);
-				filename_len = strlen(dentry->d_name);
-				concat_tmp = (char*)malloc(sizeof(char) * (path_len + filename_len + 2));
-
-				strcpy(concat_tmp, rpath);
-				concat_tmp[path_len] = '/';
-				strcpy(concat_tmp + path_len + 1, dentry->d_name);
+				concat_tmp = path_concat(rpath, dentry->d_name);
 
 				enqueue(&q, concat_tmp);
 			}
@@ -169,7 +176,7 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 			fh = (FILEHASH*)malloc(sizeof(FILEHASH));
 			fh->size = statbuf.st_size;
 			fh->pathname = rpath;
-			fh->hash = hashfunc(fd);
+			fh->hash = hashstrfunc(fd);
 			fh->mtime = statbuf.st_mtime;
 			fh->atime = statbuf.st_atime;
 
@@ -186,7 +193,7 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 		head2 = (LNKLIST*)(cur->val);
 		tmp = cur->next;
 		if(head2->next == head2->prev) {
-			lnklist_destroy(head2, NULL);
+			lnklist_destroy(head2, free_filehash);
 			lnklist_delete(cur);
 		}
 
@@ -195,6 +202,12 @@ LNKLIST *search_dup(char *path, off_t llimit, off_t ulimit, char *fextension, ch
 
 	free(q.arr);
 	return head;
+}
+
+void timestr(char *buf, time_t t) {
+	char time_format[] = "%Y-%m-%d %H:%M:%S";
+
+	strftime(buf, TIMESTR_BUF_SIZE, time_format, gmtime(&t));
 }
 
 void print_dup_list(FILE *fp, LNKLIST *head) {
@@ -208,7 +221,6 @@ void print_dup_list(FILE *fp, LNKLIST *head) {
 	char bytes_buf[50];
 	char mtime_buf[TIMESTR_BUF_SIZE];
 	char atime_buf[TIMESTR_BUF_SIZE];
-	char time_format[] = "%Y-%m-%d %H:%M:%S";
 
 	set_i = 1;
 	cur_1 = head->next;
@@ -228,8 +240,8 @@ void print_dup_list(FILE *fp, LNKLIST *head) {
 
 		while(head_2 != cur_2) {
 			fh = (FILEHASH*)(cur_2->val);
-			strftime(mtime_buf, TIMESTR_BUF_SIZE, time_format, gmtime(&(fh->mtime)));
-			strftime(atime_buf, TIMESTR_BUF_SIZE, time_format, gmtime(&(fh->atime)));
+			timestr(mtime_buf, fh->mtime);
+			timestr(atime_buf, fh->atime);
 			fprintf(fp, "[%d] %s (mtime : %s) (atime : %s)\n", file_i, fh->pathname, mtime_buf, atime_buf);
 			file_i++;
 			cur_2 = cur_2->next;

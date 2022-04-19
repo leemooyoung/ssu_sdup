@@ -13,4 +13,8 @@ off_t strtosize(char *str);
 
 int size_to_sep_str(char *buf, off_t size);
 
+char *path_concat(char *path1, char *path2);
+
+char *get_filename(char *path);
+
 #endif

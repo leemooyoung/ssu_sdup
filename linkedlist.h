@@ -23,4 +23,8 @@ void *lnklist_delete(LNKLIST *node);
 // destroy_data가 NULL이면 val에 대해 free를 호출
 int lnklist_destroy(LNKLIST *head, void (*destroy_data)(void *));
 
+// n 번째 원소를 반환한다. 없으면 NULL 반환
+// 1번부터 시작. 0이 입력되면 NULL 반환
+LNKLIST *lnklist_find_n(LNKLIST *head, int n);
+
 #endif

@@ -73,3 +73,17 @@ int lnklist_destroy(LNKLIST *head, void (*destroy_data)(void *)) {
 
 	return 0;
 }
+
+LNKLIST *lnklist_find_n(LNKLIST *head, int n) {
+	LNKLIST *e = head->next;
+	int i = 1;
+	while(e != head && i < n) {
+		i++;
+		e = e->next;
+	}
+
+	if(e == head)
+		return NULL;
+	else
+		return e;
+}
