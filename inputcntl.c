@@ -6,10 +6,6 @@
 #include "inputcntl.h"
 
 char *get_input(FILE *fp, char * buf, int size) {
-	// EOF 또는 개행을 받을 때 까지의 입력을 받는다. EOF, 개행은 버려진다.
-	// 최대 size - 1 개 만큼의 문자를 받을 수 있다.
-	// size - 1 이후 EOF 또는 개행을 만날 때 까지의 입력은 버려진다.
-
 	int c;
 	int i;
 
@@ -26,10 +22,6 @@ char *get_input(FILE *fp, char * buf, int size) {
 }
 
 char **split_by_word(char *str) {
-	// space 단위로 분리
-	// 원본 배열 (str) 에 있는 space를 전부 \0 로 바꾼다.
-	// 각 word의 시작 주소를 저장한 배열을 동적 할당해서 그 시작 주소를 반환함
-
 	int word_cnt = 0;
 	int arr_size = SBW_RES_ARR_DEFAULT;
 	char **result;
@@ -68,9 +60,6 @@ char **split_by_word(char *str) {
 	return result;
 }
 
-// -1 : 무제한
-// -2 : 잘못된 입력
-// 그 외 : size
 off_t strtosize(char *str) {
 	off_t size;
 	int i;
@@ -152,7 +141,6 @@ off_t strtosize(char *str) {
 	return size + frpart;
 }
 
-// 천 단위마다 쉼표로 구분된 문자열 생성. 음수는 지원하지 않음
 int size_to_sep_str(char *buf, off_t size) {
 	off_t tmp = size;
 	int digit = 0;

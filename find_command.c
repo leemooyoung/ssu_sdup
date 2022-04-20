@@ -66,7 +66,6 @@ int find_command(int argc, char *argv[], char *(*hashstrfunc)(int)) {
 	off_t ulimit;
 	char *target_dir;
 	char *env_home;
-	int env_home_len;
 	LNKLIST *head;
 	LNKLIST *set;
 	LNKLIST *flist;
@@ -114,11 +113,7 @@ int find_command(int argc, char *argv[], char *(*hashstrfunc)(int)) {
 	if(strcmp(argv[4], "~") == 0 && env_home != NULL) {
 		target_dir = env_home;
 	} else if(strncmp(argv[4], "~/", 2) == 0 && env_home != NULL) {
-		env_home_len = strlen(env_home);
-		target_dir = (char*)malloc(sizeof(char) * (env_home_len + strlen(argv[4])));
-		// ~ 의 자리는 \0이 대체하기 때문에 길이에서 하나 빼줄 필요는 없음
-		strcpy(target_dir, env_home);
-		strcpy(target_dir + env_home_len, argv[4] + 1);
+		target_dir = path_concat(env_home, argv[4] + 2);
 	} else
 		target_dir = argv[4];
 
@@ -228,10 +223,11 @@ int find_command(int argc, char *argv[], char *(*hashstrfunc)(int)) {
 			continue;
 		}
 
+		printf("\n");
+
 		if(head->next == head)
 			break;
 		else {
-			printf("\n");
 			print_dup_list(stdout, head);
 		}
 	}
@@ -383,9 +379,9 @@ int dup_set_process(LNKLIST *head, int set_index, int option, int list_index) {
 			lnklist_destroy((LNKLIST*)lnklist_delete(set_node), free_filehash);
 
 			if(option == FIND_OPTION_FORCE)
-				printf("Left file in #%d : %s (%s)\n\n", set_index, latest_fh->pathname, timestr_buf);
+				printf("Left file in #%d : %s (%s)\n", set_index, latest_fh->pathname, timestr_buf);
 			else if(option == FIND_OPTION_TRASH)
-				printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n", set_index, latest_fh->pathname, timestr_buf);
+				printf("All files in #%d have moved to Trash except \"%s\" (%s)\n", set_index, latest_fh->pathname, timestr_buf);
 			
 			free_filehash(latest_fh);
 		break;
@@ -402,9 +398,9 @@ int dup_set_process(LNKLIST *head, int set_index, int option, int list_index) {
 			lnklist_destroy((LNKLIST*)lnklist_delete(set_node), free_filehash);
 
 			if(option == FIND_OPTION_DELETE_ALL)
-				printf("All files in #%d have deleted\n\n", set_index);
+				printf("All files in #%d have deleted\n", set_index);
 			else if(option == FIND_OPTION_TRASH_ALL)
-				printf("ALL files in #%d have moved to Trash\n\n", set_index);
+				printf("ALL files in #%d have moved to Trash\n", set_index);
 		break;
 		case FIND_OPTION_OLD_TRASH:
 			// trash 옵션인 경우 trash 폴더가 있는지 검사. 없다면(trash_path == NULL) 만들기를 시도
@@ -435,9 +431,9 @@ int dup_set_process(LNKLIST *head, int set_index, int option, int list_index) {
 			lnklist_destroy((LNKLIST*)lnklist_delete(set_node), free_filehash);
 
 			if(option == FIND_OPTION_OLD_FORCE)
-				printf("Left file in #%d : %s (%s)\n\n", set_index, latest_fh->pathname, timestr_buf);
+				printf("Left file in #%d : %s (%s)\n", set_index, latest_fh->pathname, timestr_buf);
 			else if(option == FIND_OPTION_OLD_TRASH)
-				printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n", set_index, latest_fh->pathname, timestr_buf);
+				printf("All files in #%d have moved to Trash except \"%s\" (%s)\n", set_index, latest_fh->pathname, timestr_buf);
 
 			free_filehash(latest_fh);
 		break;
